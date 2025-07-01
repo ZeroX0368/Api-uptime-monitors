@@ -13,7 +13,7 @@ import os
 app = FastAPI(title="Uptime Monitor API", version="1.0.0")
 
 # API Key configuration
-VALID_API_KEY = os.environ.get("API_KEY", "bucudeptrai")
+VALID_API_KEY = os.environ.get("API_KEY", "dabibanban")
 
 
 def verify_api_key(apikey: str = Query(..., description="API key required for authentication")):
@@ -226,6 +226,15 @@ async def add_monitor_post(url: str, background_tasks: BackgroundTasks, apikey: 
 @app.delete("/api/uptime/monitors/remove")
 async def remove_monitor(url: str, apikey: str = Depends(verify_api_key)):
     """Remove a URL from monitoring"""
+    if url not in monitors:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    del monitors[url]
+    return {"message": f"Monitor removed for {url}"}
+
+@app.get("/api/uptime/monitors/remove")
+async def remove_monitor_get(url: str, apikey: str = Depends(verify_api_key)):
+    """Remove a URL from monitoring via GET request"""
     if url not in monitors:
         raise HTTPException(status_code=404, detail="Monitor not found")
     
