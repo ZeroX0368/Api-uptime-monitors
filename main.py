@@ -233,13 +233,56 @@ async def remove_monitor(url: str, apikey: str = Depends(verify_api_key)):
     return {"message": f"Monitor removed for {url}"}
 
 @app.get("/api/uptime/monitors/remove")
-async def remove_monitor_get(url: str, apikey: str = Depends(verify_api_key)):
-    """Remove a URL from monitoring via GET request"""
-    if url not in monitors:
-        raise HTTPException(status_code=404, detail="Monitor not found")
+async def remove_monitor_get(
+    url: Optional[str] = None, 
+    status: Optional[str] = None,
+    apikey: str = Depends(verify_api_key)
+):
+    """Remove URL(s) from monitoring via GET request"""
     
-    del monitors[url]
-    return {"message": f"Monitor removed for {url}"}
+    if url and status:
+        raise HTTPException(status_code=400, detail="Cannot specify both url and status parameters")
+    
+    if url:
+        # Remove specific URL
+        if url not in monitors:
+            raise HTTPException(status_code=404, detail="Monitor not found")
+        del monitors[url]
+        return {"message": f"Monitor removed for {url}"}
+    
+    elif status:
+        # Remove monitors by status
+        if status not in ["up", "down", "all"]:
+            raise HTTPException(status_code=400, detail="Status must be 'up', 'down', or 'all'")
+        
+        removed_urls = []
+        urls_to_remove = []
+        
+        for monitor_url, monitor_data in monitors.items():
+            if monitor_data["checks"]:
+                latest_check = monitor_data["checks"][-1]
+                latest_status = latest_check["status"]
+                
+                if status == "all" or latest_status == status:
+                    urls_to_remove.append(monitor_url)
+                    removed_urls.append({
+                        "url": monitor_url,
+                        "status": latest_status,
+                        "last_checked": latest_check["last_checked"]
+                    })
+        
+        # Remove the URLs
+        for url_to_remove in urls_to_remove:
+            del monitors[url_to_remove]
+        
+        return {
+            "message": f"Removed {len(removed_urls)} monitors with status '{status}'",
+            "removed_monitors": removed_urls,
+            "total_removed": len(removed_urls)
+        }
+    
+    else:
+        raise HTTPException(status_code=400, detail="Must specify either 'url' or 'status' parameter")
 
 @app.get("/api/uptime/monitors/history")
 async def get_monitor_history(url: str, limit: int = 50, apikey: str = Depends(verify_api_key)):
